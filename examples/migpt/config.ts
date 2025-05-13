@@ -13,7 +13,7 @@ export const kOpenXiaoAIConfig: OpenXiaoAIConfig = {
      * - ❌ https://api.openai.com/v1/（最后多了一个 /
      * - ❌ https://api.openai.com/v1/chat/completions（不需要加 /chat/completions）
      */
-    baseURL: "https://api.openai.com/v1",
+    baseURL: "http://192.168.31.140:11434/v1",
     /**
      * API 密钥
      */
@@ -21,15 +21,15 @@ export const kOpenXiaoAIConfig: OpenXiaoAIConfig = {
     /**
      * 模型名称
      */
-    model: "gpt-4.1-mini",
+    model: "qwen3:30b-a3b",
   },
   prompt: {
     /**
      * 系统提示词，如需关闭可设置为：''（空字符串）
      */
-    system: "你是一个智能助手，请根据用户的问题给出回答。",
-  },
-  context: {
+    system: "你是一个智能语音助手，请用简洁明了的方式回答用户的问题。回答必须在2句话以内。你的名字叫“小爱同学”。/no_think",
+    },
+    context: {
     /**
      * 每次对话携带的最大历史消息数（如需关闭可设置为：0）
      */
@@ -51,7 +51,7 @@ export const kOpenXiaoAIConfig: OpenXiaoAIConfig = {
     }
 
     if (text === "测试播放音乐") {
-      return { url: "https://example.com/hello.mp3" };
+      return { url: "https://sditdemo.github.io/sditdemo/static/audio_sample/rebuttal/sec1/prompt.wav" };
     }
 
     if (text === "测试其他能力") {
@@ -63,7 +63,7 @@ export const kOpenXiaoAIConfig: OpenXiaoAIConfig = {
       await engine.speaker.play({ text: "你好，很高兴认识你！", blocking: true });
 
       // 播放音频链接
-      await engine.speaker.play({ url: "https://example.com/hello.mp3" });
+      await engine.speaker.play({ url: "https://sditdemo.github.io/sditdemo/static/audio_sample/rebuttal/sec1/prompt.wav" });
 
       // 告诉 MiGPT 已经处理过这条消息了，不再使用默认的 AI 回复
       return { handled: true };
