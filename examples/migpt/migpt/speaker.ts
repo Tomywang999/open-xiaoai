@@ -2,6 +2,22 @@ import { jsonEncode } from "@mi-gpt/utils/parse";
 import { RustServer } from "./open-xiaoai.js";
 import type { ISpeaker } from "@mi-gpt/engine/base";
 
+/**
+ * Remove all thinking tags from text
+ * This comprehensively cleans <think> and </think> tags from text responses
+ */
+function removeThinkingTags(text: string): string {
+  if (!text) return text;
+  
+  // Remove simple tags
+  let result = text.replace(/<think>|<\/think>/g, "");
+  
+  // Remove tags with content between them (including multi-line)
+  result = result.replace(/<think>[\s\S]*?<\/think>/g, "");
+  
+  return result;
+}
+
 export interface CommandResult {
   stdout: string;
   stderr: string;
@@ -9,7 +25,10 @@ export interface CommandResult {
 }
 
 class SpeakerManager implements ISpeaker {
-  status: "playing" | "paused" | "idle" = "idle";
+  /**
+   * Current speaker status
+   */
+  status: "idle" | "playing" | "paused" = "idle";
 
   /**
    * 获取播放状态
@@ -38,40 +57,32 @@ class SpeakerManager implements ISpeaker {
   }
 
   /**
-   * 播放文字、音频链接、音频流
+   * Play text or URL
    */
-  async play({
-    text,
-    url,
-    bytes,
-    timeout = 10 * 60 * 1000,
-    blocking = false,
-  }: {
+  async play(options: {
     text?: string;
     url?: string;
-    bytes?: Uint8Array;
-    /**
-     * 超时时长（毫秒）
-     *
-     * 默认 10 分钟
-     */
-    timeout?: number;
-    /**
-     * 是否阻塞运行(仅对播放文字、音频链接有效)
-     *
-     * 如果是则等到音频播放完毕才会返回
-     */
     blocking?: boolean;
-  }) {
-    if (bytes) {
-      return RustServer.on_output_data(bytes) as Promise<boolean>;
-    }
+  }): Promise<boolean> {
+    const { text, url, blocking } = options;
+    
+    // Clean any thinking tags from the text before playing
+    const cleanText = text ? removeThinkingTags(text) : text;
+    
+    // Use a different timeout based on the content length
+    const timeout = blocking
+      ? text
+        ? Math.max(20, text.length * 0.15) * 1000
+        : 20 * 1000
+      : 10 * 1000;
 
-    if (blocking) {
+    // 新版小爱音箱 Pro
+    const newDevice = await this.isNewDevice();
+    if (newDevice) {
       const res = await this.runShell(
         url
-          ? `miplayer -f '${url}'`
-          : `/usr/sbin/tts_play.sh '${text || "你好"}'`,
+          ? `curl '${url}' | aplay -Dhw:0,0 -f S16_LE -c 1 -r 24000 -`
+          : `/usr/sbin/tts_play.sh '${cleanText || "你好"}'`,
         { timeout }
       );
       return res?.exit_code === 0;
@@ -84,7 +95,7 @@ class SpeakerManager implements ISpeaker {
             type: 1,
           })}'`
         : `ubus call mibrain text_to_speech '${jsonEncode({
-            text: text || "你好",
+            text: cleanText || "你好",
             save: 0,
           })}'`,
       { timeout }
@@ -230,6 +241,16 @@ class SpeakerManager implements ISpeaker {
     } catch (_) {
       return undefined;
     }
+  }
+
+  /**
+   * 检测是否是新版小爱音箱 Pro
+   */
+  private async isNewDevice() {
+    const res = await this.runShell(
+      "cat /proc/cpuinfo | grep Hardware | awk '{print $3}'"
+    );
+    return res?.stdout?.toLowerCase()?.includes("amlogic");
   }
 }
 

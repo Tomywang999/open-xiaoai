@@ -12,6 +12,24 @@ const kDefaultOpenXiaoAIConfig: OpenXiaoAIConfig = {
   //
 };
 
+/**
+ * Remove thinking tags from text
+ * This cleans <think> and </think> tags from OpenAI API responses
+ * including multi-line cases where tags might have line breaks
+ */
+function removeThinkingTags(text: string): string {
+  // First remove individual tags
+  let result = text.replace(/<think>|<\/think>/g, "");
+  
+  // Handle multi-line think tags with content between them
+  result = result.replace(/<think>\s*\n([\s\S]*?)\n\s*<\/think>/g, "");
+  
+  // Final cleanup to catch any remaining think blocks with or without line breaks
+  result = result.replace(/<think>[\s\S]*?<\/think>/g, "");
+  
+  return result;
+}
+
 class OpenXiaoAIEngine extends MiGPTEngine {
   speaker = OpenXiaoAISpeaker;
 
@@ -25,6 +43,17 @@ class OpenXiaoAIEngine extends MiGPTEngine {
     // 启动服务
     console.log("✅ 服务已启动...");
     await RustServer.start();
+  }
+
+  /**
+   * Process AI response to remove thinking tags
+   * Override the parent class method to clean the response
+   */
+  protected override async processAIResponse(response: string): Promise<string> {
+    // First run the parent implementation if there is any
+    const processedResponse = await super.processAIResponse?.(response) || response;
+    // Then remove thinking tags from the processed response
+    return removeThinkingTags(processedResponse);
   }
 
   /**
